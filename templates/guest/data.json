@@ -1,0 +1,11 @@
+{
+    "username": "guest",
+    "email": "player1@example.com",
+    "money": 1000,
+    "equipped": {
+        "hat": null,
+        "body": "basic_body_blue",
+        "face": "basic_eyes",
+        "torso": "beta_torso"
+    }
+}

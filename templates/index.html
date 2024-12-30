@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Tracker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        .client-list {
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Client Tracker</h1>
+    <div class="client-list" id="clientList">Connected Clients:</div>
+
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" name="file" id="fileInput" accept=".zip">
+        <input type="hidden" name="client_id" id="clientIdInput">
+        <button type="submit">Upload Save File</button>
+    </form>
+
+    <script>
+        var socket = io.connect(window.location.origin, { autoConnect: false });
+
+        // Ensure that the socket connects only once
+        if (!socket.connected) {
+            socket.connect();
+        }
+
+        socket.on('assign_id', function(data) {
+            console.log('Assigned ID:', data.client_id);
+            document.getElementById('clientIdInput').value = data.client_id;
+        });
+
+        socket.on('update_clients', function(data) {
+            var clientList = document.getElementById('clientList');
+            clientList.textContent = 'Connected Clients: ' + data.clients.join(', ');
+        });
+
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            fetch('/upload_save', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data.message);
+                alert(data.message);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        });
+    </script>
+
+    <form id="changeUsernameForm">
+        <input type="text" id="newUsername" name="newUsername" placeholder="New Username">
+        <button type="button" onclick="changeUsername()">Change Username</button>
+    </form>
+    <p id="changeUsernameMessage"></p>
+    <script>
+        async function changeUsername() {
+            const newUsername = document.getElementById('newUsername').value;
+            const clientId = document.getElementById('clientIdInput').value;
+            const response = await fetch('/change_username', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ client_id: clientId, new_username: newUsername })
+            });
+            const result = await response.json();
+            document.getElementById('changeUsernameMessage').textContent = result.message;
+        }
+    </script>
+
+    <!-- New Forms for Requesting and Confirming Email Change -->
+    <form id="requestChangeEmailForm">
+        <input type="email" id="newEmail" name="newEmail" placeholder="New Email">
+        <button type="button" onclick="requestChangeEmail()">Request Email Change</button>
+    </form>
+    <p id="requestChangeEmailMessage"></p>
+
+    <form id="confirmChangeEmailForm" style="display: none;">
+        <input type="text" id="confirmationCode" name="confirmationCode" placeholder="Confirmation Code">
+        <button type="button" onclick="confirmChangeEmail()">Confirm Email Change</button>
+    </form>
+    <p id="confirmChangeEmailMessage"></p>
+
+    <script>
+        async function requestChangeEmail() {
+            const newEmail = document.getElementById('newEmail').value;
+            const clientId = document.getElementById('clientIdInput').value;
+            const response = await fetch('/request_change_email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ client_id: clientId, new_email: newEmail })
+            });
+            const result = await response.json();
+            document.getElementById('requestChangeEmailMessage').textContent = result.message;
+            document.getElementById('confirmChangeEmailForm').style.display = 'block';
+        }
+
+        async function confirmChangeEmail() {
+            const confirmationCode = document.getElementById('confirmationCode').value;
+            const clientId = document.getElementById('clientIdInput').value;
+            const response = await fetch('/confirm_change_email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ client_id: clientId, confirmation_code: confirmationCode })
+            });
+            const result = await response.json();
+            document.getElementById('confirmChangeEmailMessage').textContent = result.message;
+        }
+    </script>
+
+</body>
+</html>
