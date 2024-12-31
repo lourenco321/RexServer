@@ -21,6 +21,15 @@ def index():
 def load_config():
     with open('config.json', 'r') as config_file:
         return json.load(config_file)
+def get_default_data():
+    with open('templates/guest/data.json', 'r') as default_data_file:
+        return json.load(default_data_file)
+def get_usernames():
+    usernames = []
+    for client_id in clients.keys():
+        user_data = get_data(client_id)
+        usernames.append(user_data['username'])
+    return usernames
 def get_data(id):
     with open(f'Players/{id}/data.json', 'r') as data_file:
         return json.load(data_file)
@@ -29,22 +38,35 @@ def save_data(id, data):
         json.dump(data, data_file)
 
 
+
+
+
+
+
 @app.route('/request_change_email', methods=['POST'])
 def request_change_email():
     data = request.json
     client_id = data['client_id']
     new_email = data['new_email']
 
-    # Generate a confirmation code
-    confirmation_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    user_data = get_data(client_id)
+    defaults = get_default_data()
 
-    # Store the confirmation code and new email in the temporary dictionary
-    confirmation_data[client_id] = {'confirmation_code': confirmation_code, 'new_email': new_email}
+    if user_data['email'] == defaults['email']:
+        user_data['email'] = new_email
+        save_data(client_id, user_data)
+        return jsonify({"message": "Email set successfully"}), 200
+    else:
+        # Generate a confirmation code
+        confirmation_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
-    # Simulate sending the confirmation code by printing it
-    print(f"Confirmation code for {client_id}: {confirmation_code}")
+        # Store the confirmation code and new email in the temporary dictionary
+        confirmation_data[client_id] = {'confirmation_code': confirmation_code, 'new_email': new_email}
 
-    return jsonify({"message": "Confirmation code sent"}), 200
+        # Simulate sending the confirmation code by printing it
+        print(f"Confirmation code for {client_id}: {confirmation_code}")
+
+        return jsonify({"message": "Confirmation code sent"}), 200
 confirmation_data = {}
 @app.route('/confirm_change_email', methods=['POST'])
 def confirm_change_email():
@@ -67,11 +89,13 @@ def change_username():
     new_username = data['new_username']
 
     user_data = get_data(client_id)
+    defaults = get_default_data()
 
-    if user_data['username'] == 'guest':
+    if user_data['username'] == defaults['username']:
         # Allow change for free
         user_data['username'] = new_username
         save_data(client_id, user_data)
+        emit('update_clients', {'clients': get_usernames()}, broadcast=True)
         return jsonify({"message": "Username changed successfully", "new_username": new_username}), 200
     else:
         # Check if the user has enough money
@@ -79,6 +103,7 @@ def change_username():
             user_data['money'] -= 1
             user_data['username'] = new_username
             save_data(client_id, user_data)
+            emit('update_clients', {'clients': get_usernames()}, broadcast=True)
             return jsonify({"message": "Username changed successfully", "new_username": new_username, "remaining_money": user_data['money']}), 200
         else:
             return jsonify({"message": "Not enough money"}), 400
@@ -177,15 +202,17 @@ def upload_save():
         if os.path.exists(save_path):
             os.remove(save_path)
 
+        socketio.emit('update_clients', {'clients': get_usernames()})
         print(f"Save uploaded by {client_id}")
         return jsonify({"message": "Save uploaded successfully"}), 200
+
 @socketio.on('connect')
 def handle_connect():
     client_id = request.sid
     clients[client_id] = {'connected': True}
     print(f"Client connected: {client_id}")
     emit('assign_id', {'client_id': client_id}, to=client_id)
-    emit('update_clients', {'clients': list(clients.keys())}, broadcast=True)
+
 
     # Define the source and destination paths
     user_template = os.path.join('templates', 'guest')
@@ -193,13 +220,15 @@ def handle_connect():
     # Copy the folder and its contents
     shutil.copytree(user_template, players)
     print(f"New save created for {client_id}")
+    emit('update_clients', {'clients': get_usernames()}, broadcast=True)
 @socketio.on('disconnect')
 def handle_disconnect():
     client_id = request.sid
     if client_id:
         clients.pop(client_id)
         print(f"Client disconnected: {client_id}")
-        emit('update_clients', {'clients': list(clients.keys())}, broadcast=True)
+        emit('update_clients', {'clients': get_usernames()}, broadcast=True)
+
         export_save(client_id)
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)

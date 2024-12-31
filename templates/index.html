@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Client Tracker</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.2/socket.io.min.js"></script>
+    <script src="path/to/littlejs.js"></script> <!-- Include LittleJS -->
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -14,17 +15,47 @@
         .client-list {
             margin: 20px;
         }
+        canvas {
+            border: 1px solid black;
+            margin-top: 20px;
+        }
+        .overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000; /* Ensure it stays on top */
+        }
+        .overlay ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        .overlay li {
+            margin: 5px 0;
+        }
     </style>
 </head>
 <body>
     <h1>Client Tracker</h1>
-    <div class="client-list" id="clientList">Connected Clients:</div>
+    <div class="client-list" id="clientList">My ID: <span id="myId"></span></div>
+
+    <!-- Player List Overlay -->
+    <div id="playerListOverlay" class="overlay">
+        <h3>Connected Players</h3>
+        <ul id="playerList"></ul>
+    </div>
 
     <form id="uploadForm" enctype="multipart/form-data">
         <input type="file" name="file" id="fileInput" accept=".zip">
         <input type="hidden" name="client_id" id="clientIdInput">
         <button type="submit">Upload Save File</button>
     </form>
+
+    <!-- Canvas for LittleJS -->
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
 
     <script>
         var socket = io.connect(window.location.origin, { autoConnect: false });
@@ -37,11 +68,18 @@
         socket.on('assign_id', function(data) {
             console.log('Assigned ID:', data.client_id);
             document.getElementById('clientIdInput').value = data.client_id;
+            document.getElementById('myId').textContent = data.client_id; // Display the client ID
         });
 
         socket.on('update_clients', function(data) {
-            var clientList = document.getElementById('clientList');
-            clientList.textContent = 'Connected Clients: ' + data.clients.join(', ');
+            var playerList = document.getElementById('playerList');
+            playerList.innerHTML = ''; // Clear the existing list
+
+            data.clients.forEach(function(username) {
+                var listItem = document.createElement('li');
+                listItem.textContent = username; // Display the username
+                playerList.appendChild(listItem);
+            });
         });
 
         document.getElementById('uploadForm').addEventListener('submit', function(e) {
@@ -60,6 +98,15 @@
                 console.error('Error:', error);
             });
         });
+
+        // Initialize LittleJS
+        function initGame() {
+            // Your LittleJS initialization and game logic here
+            console.log('Game initialized');
+        }
+
+        // Start the game
+        initGame();
     </script>
 
     <form id="changeUsernameForm">
